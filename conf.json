@@ -1,0 +1,15 @@
+{
+    "severity_weights": {
+        "HIGH": 10.0,
+        "MEDIUM": 2.0,
+        "LOW": 0.5,
+        "WARNING": 2.5,
+        "NOTE": 0.2
+    },
+    "alpha": 0.5,
+    "epsilon": 1e-6,
+    "b_small": 1e-3,
+    "b_large": 1000,
+    "epsilon_complete": 1e-3,
+    "atheris_time": 10
+}
