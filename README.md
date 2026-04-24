@@ -5,9 +5,27 @@
 ## 安装依赖
 
 ```bash
-conda activate sysbench
-pip install radon bandit codeql
+sudo apt update
+sudo apt install git curl unzip openjdk-17-jdk -y
+curl -L -o codeql.zip https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip
+unzip codeql.zip
+nano ~/.bashrc
 ```
+
+添加`export PATH="$PATH:$HOME/codeql/codeql"`
+
+```bash
+source ~/.bashrc
+pip install hypothesis
+pip install radon
+pip3 install bandit
+
+sudo apt update
+sudo apt install -y clang llvm python3-dev build-essential
+pip install "atheris==2.3.0"
+```
+
+
 
 ## 配置
 
