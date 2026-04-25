@@ -90,7 +90,6 @@ dataset/
     │   └── answer.py
     └── ...
 ```
-
 ## 输出指标
 
 ### 样本级指标
@@ -102,9 +101,11 @@ dataset/
 | `L_mod` | 修复后代码逻辑行数 |
 | `E0_orig` | 原始代码 $E_0$（平均风险能量）|
 | `E0_mod` | 修复后 $E_0$ |
-| `dE0` | $\Delta E_0 = E_{0 \space mod} - E_{0 \space orig}$ （负值表示风险降低）|
+| `dE0` | $\Delta E_0 = E_{0 \text{ mod}} - E_{0 \text{ orig}}$（负值表示风险降低）|
 | `dEinf` | $\Delta E_{\infty}$（尾风险变化）|
-| `KL` | KL散度（漏洞分布结构性变化）|
+| `TV` | Total Variation distance（漏洞分布结构性变化）|
+
+---
 
 ### 批量级指标（LLM-level）
 
@@ -112,36 +113,44 @@ dataset/
 |------|------|
 | `Mean Delta E0` | 平均能量变化，衡量整体风险降低幅度 |
 | `Mean Delta Einf` | 平均尾风险变化 |
-| `Mu KL` | KL散度均值，衡量分布结构平均变化 |
-| `Sigma KL` | KL散度标准差 |
-| `R_infinity` | 尾风险降低率（$\Delta E \lt 0$ 的样本比例）|
+| `Mu TV` | TV distance 均值，衡量分布结构平均变化 |
+| `Sigma TV` | TV distance 标准差 |
+| `R_infinity` | 尾风险降低率（$\Delta E_{\infty} < 0$ 的样本比例）|
 | `R_0` | 平均风险降低率（$\Delta E_0 < 0$ 的样本比例）|
-| `R_complete` | 完全安全率（$E_{\infty} + E_0 \leq \varepsilon$ 的样本比例）|
+| `R_complete` | 完全安全率（$E_{\infty} + E_0 \leq \epsilon$ 的样本比例）|
+
+---
 
 ## 能量公式
 
 ### 漏洞密度
 
-$$d_i^{(k)} = \frac{w_i \cdot r_i}{\sqrt{L}}$$
+$$
+d_i^{(k)} = \frac{w_i \cdot r_i}{\sqrt{L}}
+$$
 
 其中 $w_i$ 是权重，$r_i$ 是漏洞数量，$L$ 是逻辑行数。
 
+---
+
 ### 能量函数
 
-$$E_b^{(k)}(C) = \frac{1}{b} \log \sum_{i=1}^{n_k} \exp\left(b \cdot d_i^{(k)}\right)$$
+$$
+E_b^{(k)}(C) = \frac{1}{b} \log \sum_{i=1}^{n_k} \exp\left(b \cdot d_i^{(k)}\right)
+$$
 
 - $b \rightarrow 0$ 时：$E_0 = \sum d_i$（平均风险）
-- $b \rightarrow \infty$ 时：$E_\infty = \max_i d_i$（最严重风险）
+- $b \rightarrow \infty$ 时：$E_{\infty} = \max_i d_i$（最严重风险）
+
+---
 
 ### 总能量
 
-$$E_b(C) = \alpha E_b^{(s)}(C) + (1 - \alpha) E_b^{(d)}(C)$$
+$$
+E_b(C) = \alpha E_b^{(s)}(C) + (1 - \alpha) E_b^{(d)}(C)
+$$
 
-### KL 散度
-
-$$D_{KL}(C_0 \parallel C_1) = \sum_i p_i \log \frac{p_i}{q_i}$$
-
-衡量 transformation 前后漏洞分布的结构性变化。
+---
 
 ### 风险评估指标
 

@@ -108,6 +108,7 @@ class EnergyMetrics:
     Einf_total: float = 0.0
 
     kl_divergence: float = 0.0
+    total_variation: float = 0.0
 
     code_metrics: Optional[CodeMetrics] = None
 
@@ -128,7 +129,7 @@ class EnergyMetrics:
         self.Einf_dynamic = self._log_sum_exp([self.dynamic_density], self.b_large) / self.b_large if self.b_large > 0 else self.dynamic_density
         self.Einf_total = self.alpha * self.Einf_static + (1 - self.alpha) * self.Einf_dynamic
 
-        self._compute_kl_divergence(static_counts, dynamic_counts, logical_lines)
+        self._compute_total_variation(static_counts, dynamic_counts, logical_lines)
 
     def _log_sum_exp(self, values: List[float], b: float) -> float:
         if not values:
@@ -140,7 +141,7 @@ class EnergyMetrics:
         max_val = max(values)
         return max_val + (1.0 / b) * math.log(sum(math.exp(b * (v - max_val)) for v in values))
 
-    def _compute_kl_divergence(self, static_counts: Dict[str, int], dynamic_counts: Dict[str, int], logical_lines: int):
+    def _compute_total_variation(self, static_counts: Dict[str, int], dynamic_counts: Dict[str, int], logical_lines: int):
         vd = VulnerabilityDensity()
 
         p_values = []
@@ -157,18 +158,14 @@ class EnergyMetrics:
         sum_q = sum(q_values)
 
         if sum_p <= 0 or sum_q <= 0:
-            self.kl_divergence = 0.0
+            self.total_variation = 0.0
             return
 
         p_normalized = [p / sum_p for p in p_values]
         q_normalized = [q / sum_q for q in q_values]
 
-        kl = 0.0
-        for p, q in zip(p_normalized, q_normalized):
-            if p > self.epsilon and q > self.epsilon:
-                kl += p * math.log(p / q)
-
-        self.kl_divergence = kl
+        tv = 0.5 * sum(abs(p - q) for p, q in zip(p_normalized, q_normalized))
+        self.total_variation = tv
 
 
 @dataclass
@@ -182,13 +179,13 @@ class PairedSampleResult:
 
     delta_E0: float = 0.0
     delta_Einf: float = 0.0
-    kl_divergence: float = 0.0
+    total_variation: float = 0.0
 
     def compute_delta(self):
         if self.original_metrics and self.modified_metrics:
             self.delta_E0 = self.modified_metrics.E0_total - self.original_metrics.E0_total
             self.delta_Einf = self.modified_metrics.Einf_total - self.original_metrics.Einf_total
-            self.kl_divergence = self.original_metrics.kl_divergence
+            self.total_variation = self.original_metrics.total_variation
 
 
 @dataclass
@@ -200,8 +197,8 @@ class BatchEvaluationResult:
     mean_delta_E0: float = 0.0
     mean_delta_Einf: float = 0.0
 
-    mu_kl: float = 0.0
-    sigma_kl: float = 0.0
+    mu_tv: float = 0.0
+    sigma_tv: float = 0.0
 
     R_infinity: float = 0.0
     R_0: float = 0.0
@@ -215,15 +212,15 @@ class BatchEvaluationResult:
 
         delta_E0_list = [r.delta_E0 for r in self.results]
         delta_Einf_list = [r.delta_Einf for r in self.results]
-        kl_list = [r.kl_divergence for r in self.results]
+        tv_list = [r.total_variation for r in self.results]
 
         self.mean_delta_E0 = sum(delta_E0_list) / len(delta_E0_list)
         self.mean_delta_Einf = sum(delta_Einf_list) / len(delta_Einf_list)
 
-        self.mu_kl = sum(kl_list) / len(kl_list) if kl_list else 0.0
+        self.mu_tv = sum(tv_list) / len(tv_list) if tv_list else 0.0
 
-        variance_kl = sum((k - self.mu_kl) ** 2 for k in kl_list) / len(kl_list) if kl_list else 0.0
-        self.sigma_kl = math.sqrt(variance_kl)
+        variance_tv = sum((t - self.mu_tv) ** 2 for t in tv_list) / len(tv_list) if tv_list else 0.0
+        self.sigma_tv = math.sqrt(variance_tv)
 
         self.R_infinity = sum(1 for d in delta_Einf_list if d < 0) / len(delta_Einf_list)
         self.R_0 = sum(1 for d in delta_E0_list if d < 0) / len(delta_E0_list)

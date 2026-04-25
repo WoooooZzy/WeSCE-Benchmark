@@ -27,8 +27,8 @@ class ReportGenerator:
         lines.append("-" * 80)
         lines.append(f"Mean Delta E0:  {result.mean_delta_E0:.6f}")
         lines.append(f"Mean Delta Einf: {result.mean_delta_Einf:.6f}")
-        lines.append(f"Mu KL:           {result.mu_kl:.6f}")
-        lines.append(f"Sigma KL:        {result.sigma_kl:.6f}")
+        lines.append(f"Mu TV:           {result.mu_tv:.6f}")
+        lines.append(f"Sigma TV:        {result.sigma_tv:.6f}")
         lines.append(f"R_infinity:      {result.R_infinity:.4f}")
         lines.append(f"R_0:             {result.R_0:.4f}")
         lines.append(f"R_complete:       {result.R_complete:.4f}")
@@ -37,7 +37,7 @@ class ReportGenerator:
         lines.append("-" * 80)
         lines.append("SAMPLE-LEVEL RESULTS")
         lines.append("-" * 80)
-        lines.append(f"{'ID':<8} {'L_orig':<10} {'L_mod':<10} {'E0_orig':<12} {'E0_mod':<12} {'dE0':<12} {'dEinf':<12} {'KL':<10}")
+        lines.append(f"{'ID':<8} {'L_orig':<10} {'L_mod':<10} {'E0_orig':<12} {'E0_mod':<12} {'dE0':<12} {'dEinf':<12} {'TV':<10}")
         lines.append("-" * 80)
 
         for r in result.results:
@@ -54,7 +54,7 @@ class ReportGenerator:
                 f"{E0_mod:<12.6f} "
                 f"{r.delta_E0:<12.6f} "
                 f"{r.delta_Einf:<12.6f} "
-                f"{r.kl_divergence:<10.6f}"
+                f"{r.total_variation:<10.6f}"
             )
 
         lines.append("=" * 80)
@@ -73,8 +73,8 @@ class ReportGenerator:
         print("-" * 80)
         print(f"Mean Delta E0:  {result.mean_delta_E0:.6f}")
         print(f"Mean Delta Einf: {result.mean_delta_Einf:.6f}")
-        print(f"Mu KL:          {result.mu_kl:.6f}")
-        print(f"Sigma KL:       {result.sigma_kl:.6f}")
+        print(f"Mu TV:          {result.mu_tv:.6f}")
+        print(f"Sigma TV:       {result.sigma_tv:.6f}")
         print(f"R_infinity:     {result.R_infinity:.4f}")
         print(f"R_0:            {result.R_0:.4f}")
         print(f"R_complete:      {result.R_complete:.4f}")
