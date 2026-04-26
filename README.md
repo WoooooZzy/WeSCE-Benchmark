@@ -1,4 +1,4 @@
-# WeSCE: Multi-Scale Energy Benchmark for Security Drift in Weakly-Specified LLM Code Editing
+# WeSCE: Multi-Scale Energy Benchmark for Security Drift in Weak-Security Constraints LLM Code Editing
 
 基于能量 formulation 的漏洞评估框架，用于评估代码 transformation 前后的安全性变化。
 
@@ -41,7 +41,6 @@ pip install "atheris==2.3.0"
         "NOTE": 0.2
     },
     "alpha": 0.5,
-    "epsilon": 1e-6,
     "b_small": 1e-3,
     "b_large": 1000,
     "epsilon_complete": 1e-3,
@@ -53,7 +52,6 @@ pip install "atheris==2.3.0"
 |------|------|
 | `severity_weights` | 各严重性等级权重 |
 | `alpha` | 静态/动态风险平衡因子|
-| `epsilon` | $KL$散度计算阈值 |
 | `b_small` | $E_0$ 的 $b$ 值，控制平均风险 |
 | `b_large` | $E_\infty$ 的 $b$ 值，控制尾风险 |
 | `epsilon_complete` | $R_{complete}$ 容忍阈值 |
