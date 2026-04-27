@@ -33,6 +33,12 @@ def analyze(target_path):
                 elif issue.get('issue_severity') == 'LOW':
                     result.low += 1
 
+                test_id = issue.get('test_id', 'unknown')
+                if test_id and test_id != 'unknown':
+                    severity = issue.get('issue_severity', 'UNKNOWN')
+                    vuln_type = f"{severity}_{test_id}"
+                    result.vulnerability_types[vuln_type] = result.vulnerability_types.get(vuln_type, 0) + 1
+
     except Exception as e:
         pass
 

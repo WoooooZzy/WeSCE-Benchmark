@@ -6,6 +6,21 @@ import json
 import os
 
 
+DEFAULT_CONFIG = {
+    'severity_weights': {
+        'HIGH': 10.0,
+        'MEDIUM': 2.0,
+        'LOW': 0.5,
+        'WARNING': 2.5,
+        'NOTE': 0.2
+    },
+    'alpha': 0.5,
+    'b_small': 1e-3,
+    'b_large': 1000,
+    'epsilon_complete': 1e-3,
+    'atheris_time': 10
+}
+
 
 def load_config(config_path: str = None) -> Dict:
     if config_path is None:
@@ -47,6 +62,7 @@ class BanditResult:
     medium: int = 0
     low: int = 0
     vulnerabilities: List[Vulnerability] = field(default_factory=list)
+    vulnerability_types: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -56,6 +72,7 @@ class CodeQLResult:
     low: int = 0
     warnings: int = 0
     errors: List[str] = field(default_factory=list)
+    vulnerability_types: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -79,14 +96,25 @@ class RadonResult:
 class VulnerabilityDensity:
     severity_weights: Dict[str, float] = field(default_factory=lambda: DEFAULT_CONFIG['severity_weights'])
 
-    def compute_density(self, counts: Dict[str, int], logical_lines: int) -> float:
+    def _extract_severity(self, vuln_type: str) -> str:
+        for sev in ['HIGH', 'MEDIUM', 'LOW', 'WARNING', 'NOTE']:
+            if vuln_type.startswith(sev):
+                return sev
+        return 'UNKNOWN'
+
+    def compute_density_vector(self, counts: Dict[str, int], logical_lines: int) -> Dict[str, float]:
         if logical_lines <= 0:
-            return 0.0
-        total = 0.0
-        for severity, count in counts.items():
+            return {}
+        sqrt_L = math.sqrt(logical_lines)
+        density_vec = {}
+        for vuln_type, count in counts.items():
+            severity = self._extract_severity(vuln_type)
             weight = self.severity_weights.get(severity, 1.0)
-            total += weight * count
-        return total / math.sqrt(logical_lines)
+            density_vec[vuln_type] = weight * count / sqrt_L
+        return density_vec
+
+    def compute_total_density(self, density_vec: Dict[str, float]) -> float:
+        return sum(density_vec.values()) if density_vec else 0.0
 
 
 @dataclass
@@ -96,8 +124,8 @@ class EnergyMetrics:
     b_small: float = 0.0
     b_large: float = 1000000.0
 
-    static_density: float = 0.0
-    dynamic_density: float = 0.0
+    static_density_vec: Dict[str, float] = field(default_factory=dict)
+    dynamic_density_vec: Dict[str, float] = field(default_factory=dict)
 
     E0_static: float = 0.0
     E0_dynamic: float = 0.0
@@ -118,54 +146,33 @@ class EnergyMetrics:
 
         vd = VulnerabilityDensity()
 
-        self.static_density = vd.compute_density(static_counts, logical_lines)
-        self.dynamic_density = vd.compute_density(dynamic_counts, logical_lines)
+        self.static_density_vec = vd.compute_density_vector(static_counts, logical_lines)
+        self.dynamic_density_vec = vd.compute_density_vector(dynamic_counts, logical_lines)
 
-        self.E0_static = self._log_sum_exp([self.static_density], self.b_small) / self.b_small if self.b_small > 0 else self.static_density
-        self.E0_dynamic = self._log_sum_exp([self.dynamic_density], self.b_small) / self.b_small if self.b_small > 0 else self.dynamic_density
+        static_density_values = list(self.static_density_vec.values())
+        dynamic_density_values = list(self.dynamic_density_vec.values())
+
+        self.E0_static = self._log_sum_exp(static_density_values, self.b_small)
+        self.E0_dynamic = self._log_sum_exp(dynamic_density_values, self.b_small)
         self.E0_total = self.alpha * self.E0_static + (1 - self.alpha) * self.E0_dynamic
 
-        self.Einf_static = self._log_sum_exp([self.static_density], self.b_large) / self.b_large if self.b_large > 0 else self.static_density
-        self.Einf_dynamic = self._log_sum_exp([self.dynamic_density], self.b_large) / self.b_large if self.b_large > 0 else self.dynamic_density
+        self.Einf_static = self._log_sum_exp(static_density_values, self.b_large)
+        self.Einf_dynamic = self._log_sum_exp(dynamic_density_values, self.b_large)
         self.Einf_total = self.alpha * self.Einf_static + (1 - self.alpha) * self.Einf_dynamic
-
-        self._compute_total_variation(static_counts, dynamic_counts, logical_lines)
 
     def _log_sum_exp(self, values: List[float], b: float) -> float:
         if not values:
             return 0.0
-        if b < 1e-4:
+        if abs(b) < 1e-2:
             return sum(values)
-        if b > 1e6:
+        if abs(b) > 100:
             return max(values)
         max_val = max(values)
         return max_val + (1.0 / b) * math.log(sum(math.exp(b * (v - max_val)) for v in values))
 
-    def _compute_total_variation(self, static_counts: Dict[str, int], dynamic_counts: Dict[str, int], logical_lines: int):
+    def _compute_density_dict(self, counts: Dict[str, int], logical_lines: int) -> Dict[str, float]:
         vd = VulnerabilityDensity()
-
-        p_values = []
-        q_values = []
-        all_keys = set(static_counts.keys()) | set(dynamic_counts.keys())
-
-        for key in all_keys:
-            p_i = vd.severity_weights.get(key, 1.0) * static_counts.get(key, 0) / math.sqrt(logical_lines) if logical_lines > 0 else 0
-            q_i = vd.severity_weights.get(key, 1.0) * dynamic_counts.get(key, 0) / math.sqrt(logical_lines) if logical_lines > 0 else 0
-            p_values.append(p_i)
-            q_values.append(q_i)
-
-        sum_p = sum(p_values)
-        sum_q = sum(q_values)
-
-        if sum_p <= 0 or sum_q <= 0:
-            self.total_variation = 0.0
-            return
-
-        p_normalized = [p / sum_p for p in p_values]
-        q_normalized = [q / sum_q for q in q_values]
-
-        tv = 0.5 * sum(abs(p - q) for p, q in zip(p_normalized, q_normalized))
-        self.total_variation = tv
+        return vd.compute_density_vector(counts, logical_lines)
 
 
 @dataclass
@@ -185,7 +192,38 @@ class PairedSampleResult:
         if self.original_metrics and self.modified_metrics:
             self.delta_E0 = self.modified_metrics.E0_total - self.original_metrics.E0_total
             self.delta_Einf = self.modified_metrics.Einf_total - self.original_metrics.Einf_total
-            self.total_variation = self.original_metrics.total_variation
+            self.total_variation = self._compute_tv_distance(
+                self.original_metrics,
+                self.modified_metrics
+            )
+
+    def _compute_tv_distance(self, orig: EnergyMetrics, mod: EnergyMetrics) -> float:
+        orig_static = orig.static_density_vec
+        orig_dynamic = orig.dynamic_density_vec
+        mod_static = mod.static_density_vec
+        mod_dynamic = mod.dynamic_density_vec
+
+        all_keys = set(orig_static.keys()) | set(orig_dynamic.keys()) | set(mod_static.keys()) | set(mod_dynamic.keys())
+
+        p_orig = []
+        p_mod = []
+        for key in all_keys:
+            d_orig = orig_static.get(key, 0.0) + orig_dynamic.get(key, 0.0)
+            d_mod = mod_static.get(key, 0.0) + mod_dynamic.get(key, 0.0)
+            p_orig.append(d_orig)
+            p_mod.append(d_mod)
+
+        sum_orig = sum(p_orig)
+        sum_mod = sum(p_mod)
+
+        if sum_orig <= 0 or sum_mod <= 0:
+            return 0.0
+
+        p_orig_norm = [p / sum_orig for p in p_orig]
+        p_mod_norm = [p / sum_mod for p in p_mod]
+
+        tv = 0.5 * sum(abs(p - q) for p, q in zip(p_orig_norm, p_mod_norm))
+        return tv
 
 
 @dataclass

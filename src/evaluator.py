@@ -52,13 +52,12 @@ class EvaluationEngine:
 
         static_counts = {}
         if test_result.bandit:
-            static_counts['HIGH'] = test_result.bandit.high
-            static_counts['MEDIUM'] = test_result.bandit.medium
-            static_counts['LOW'] = test_result.bandit.low
+            for vuln_type, count in test_result.bandit.vulnerability_types.items():
+                static_counts[vuln_type] = count
 
         if test_result.codeql:
-            static_counts['WARNING'] = test_result.codeql.warnings
-            static_counts['NOTE'] = test_result.codeql.low
+            for vuln_type, count in test_result.codeql.vulnerability_types.items():
+                static_counts[vuln_type] = static_counts.get(vuln_type, 0) + count
 
         dynamic_counts = {}
         if test_result.atheris and not test_result.atheris.error:

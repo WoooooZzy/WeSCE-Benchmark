@@ -43,12 +43,22 @@ def analyze(target_path):
                 results = sarif_data['runs'][0].get('results', [])
                 for r in results:
                     level = r.get('level', '')
+                    rule_id = r.get('ruleId', 'unknown')
                     if level == 'error':
                         result.high += 1
                     elif level == 'warning':
                         result.warnings += 1
                     elif level == 'note':
                         result.low += 1
+
+                    if rule_id and rule_id != 'unknown':
+                        if level == 'error':
+                            vuln_type = f"HIGH_{rule_id}"
+                        elif level == 'warning':
+                            vuln_type = f"WARNING_{rule_id}"
+                        else:
+                            vuln_type = f"NOTE_{rule_id}"
+                        result.vulnerability_types[vuln_type] = result.vulnerability_types.get(vuln_type, 0) + 1
 
             os.remove('temp_codeql_results.sarif')
 
